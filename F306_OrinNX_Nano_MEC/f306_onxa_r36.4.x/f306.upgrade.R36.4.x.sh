@@ -202,6 +202,9 @@ fi
 sudo cp rootfs/$videodev_dir/fzcama.ko $videodev_dir
 sudo cp rootfs/$videodev_dir/fzcamb.ko $videodev_dir
 
+# Add softdep to ensure fzcama loads before fzcamb
+echo "softdep fzcamb pre: fzcama" | sudo tee /etc/modprobe.d/fzcam.conf
+
 # RTL Ethernet
 ## copy r8168.ko file ##
 r8168_dir=/lib/modules/$(uname -r)/updates/drivers/net/ethernet/realtek/r8168

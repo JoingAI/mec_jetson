@@ -36,7 +36,7 @@ else
 			echo $str_ver
 			green_print 'JetPack R36.4.4 is corret, JetPack版本匹配自动升级'
 		else
-			if [[ $str == *$str_ver4* ]]; then
+			if [[ $str == *$str_ver7* ]]; then
 				echo $str_ver
 				green_print 'JetPack R36.4.7 is corret, JetPack版本匹配自动升级'
 			else
@@ -208,6 +208,8 @@ sudo cp rootfs/$wifi_dir/rtl8852be.ko $wifi_dir
 sudo modprobe cfg80211
 sudo modprobe rtl8852be
 
+# Add softdep to ensure fzcam loads before g300
+echo "softdep g300 pre: fzcam" | sudo tee /etc/modprobe.d/fzcam.conf
 
 sudo depmod -a
 ## copy Image file ##
