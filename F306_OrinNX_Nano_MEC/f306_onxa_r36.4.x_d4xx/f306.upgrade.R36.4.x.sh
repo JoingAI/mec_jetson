@@ -44,10 +44,53 @@ else
 				exit
 			fi
 		fi
-	fi
+fi
 fi
 
-# copy dtb
+# ----------------------------------------------------
+# 交互式相机配置选择
+# ----------------------------------------------------
+red_print "请选择相机配置 (Select Camera Configuration):"
+echo "  1) 1x D4XX + 2x RGB (MAX96724 LinkA (CAM1))"
+echo "  2) 2x D4XX + 2x RGB (MAX96724 LinkA+B (CAM1/CAM2))"
+echo "  3) 1x D4XX + 4x RGB (MAX9296 LinkA (CAM4))"
+echo "  4) 2x D4XX + 4x RGB (MAX9296 LinkA+B (CAM4/CAM5 not support))"
+echo ""
+read -p "Enter choice [1-4] (default: 2): " choice
+choice="${choice:-2}"
+
+case "$choice" in
+    1)
+        CAM_DTBO="tegra234-p3767-camera-p3768-f306-1xd4xx-2xrgb.dtbo"
+        HW_CONFIG="Camera F306_1xD4XX_2xRGB"
+        MENU_LABEL="Custom Header Config: <CSI Camera F306_1xD4XX_2xRGB>"
+        ;;
+    3)
+        CAM_DTBO="tegra234-p3767-camera-p3768-f306-1xd4xx-4xrgb.dtbo"
+        HW_CONFIG="Camera F306_1xD4XX_4xRGB"
+        MENU_LABEL="Custom Header Config: <CSI Camera F306_1xD4XX_4xRGB>"
+        ;;
+    4)
+        CAM_DTBO="tegra234-p3767-camera-p3768-f306-2xd4xx-4xrgb.dtbo"
+        HW_CONFIG="Camera F306_2xD4XX_4xRGB"
+        MENU_LABEL="Custom Header Config: <CSI Camera F306_2xD4XX_4xRGB>"
+        ;;
+    2)
+        CAM_DTBO="tegra234-p3767-camera-p3768-f306-2xd4xx-2xrgb.dtbo"
+        HW_CONFIG="Camera F306_2xD4XX_2xRGB"
+        MENU_LABEL="Custom Header Config: <CSI Camera F306_2xD4XX_2xRGB>"
+        ;;
+    *)
+        red_print "错误: 无效选项 '$choice'，请输入 1-4"
+        exit 1
+        ;;
+esac
+
+green_print "Selected: $HW_CONFIG"
+echo "DTBO: $CAM_DTBO"
+echo ""
+
+# copy dtb files
 if [ -e /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb ]; then
 	if [ ! -f "/boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb.orig" ];then
 	echo "bakckup DTB"
@@ -126,15 +169,13 @@ if [ -e /boot/dtb/kernel_tegra234-p3768-0000+p3767-0004-nv-super.dtb ]; then
 fi
 
 # Modified /boot/extlinux/extlinux.conf to add following DTBO entries
-sudo cp rootfs/boot/tegra234-p3767-camera-p3768-f306.dtbo /boot/
+sudo cp "rootfs/boot/${CAM_DTBO}" /boot/
 sudo cp rootfs/boot/tegra234-p3767-0000-f306-board.dtbo /boot/
-sudo /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Camera F306x6RGB"
+sudo /opt/nvidia/jetson-io/config-by-hardware.py -n 2="${HW_CONFIG}"
 
 ###############################################Replace
-OLD_TEXT="MENU LABEL Custom Header Config: <CSI Camera F306x6RGB>"
-NEW_TEXT="MENU LABEL Custom Header Config: <CSI Camera F306x6RGB> <HDR40 Jetson F306 BOARD CONFIG>"
+NEW_TEXT="${MENU_LABEL} <HDR40 Jetson F306 BOARD CONFIG>"
 TARGET_FILE="/boot/extlinux/extlinux.conf"
-#cat $TARGET_FILE
 echo ''
 if [ -z "$TARGET_FILE" ]; then
 	echo "Failed to get extlinux.conf" >&2
@@ -145,7 +186,7 @@ if [ ! -f "$TARGET_FILE" ]; then
 	exit 1
 fi
 
-sed -i.bak "s#^${OLD_TEXT}\$#${NEW_TEXT}#" "$TARGET_FILE"
+# Replace entire MENU LABEL line
 NEW_REGEX_TEXT="MENU LABEL Custom Header Config:.*"
 sed -i "s#${NEW_REGEX_TEXT}#${NEW_TEXT}#" "$TARGET_FILE"
 if grep -qF "$NEW_TEXT" "$TARGET_FILE"; then
@@ -154,17 +195,18 @@ else
 	echo "Failed to set MENU LABEL" >&2
 	exit 1
 fi
-OLD_TEXT="OVERLAYS /boot/tegra234-p3767-camera-p3768-f306.dtbo"
-NEW_TEXT="OVERLAYS /boot/tegra234-p3767-camera-p3768-f306.dtbo,/boot/tegra234-p3767-0000-f306-board.dtbo"
-NEW_REGEX_TEXT="OVERLAYS /boot/tegra234-p3767-camera-p3768-f306.dtbo.*"
-sed -i "s#${NEW_REGEX_TEXT}#${NEW_TEXT}#" "$TARGET_FILE"
-if grep -q "$NEW_TEXT" "$TARGET_FILE"; then
-	grep "$NEW_TEXT" "$TARGET_FILE"
+
+# Replace OVERLAYS line
+OLD_OVERLAYS="OVERLAYS /boot/${CAM_DTBO}"
+NEW_OVERLAYS="OVERLAYS /boot/${CAM_DTBO},/boot/tegra234-p3767-0000-f306-board.dtbo"
+NEW_OVERLAYS_REGEX="OVERLAYS /boot/${CAM_DTBO}.*"
+sed -i "s#${NEW_OVERLAYS_REGEX}#${NEW_OVERLAYS}#" "$TARGET_FILE"
+if grep -q "$NEW_OVERLAYS" "$TARGET_FILE"; then
+	grep "$NEW_OVERLAYS" "$TARGET_FILE"
 else
 	echo "Failed to modify extlinux.conf" >&2
 	exit 1
 fi
-
 
 #################################### Image and ko ###################################################
 ## copy Image file ##
@@ -174,16 +216,16 @@ if [ ! -f "/boot/Image.orig" ];then
 fi
 sudo cp rootfs/boot/Image /boot/ 
 
-# Sound
-## copy fzcam.ko file ##
-videodev_dir=/lib/modules/$(uname -r)/kernel/sound/soc/codecs
-if [ -e $videodev_dir/snd-soc-nau8822.ko ];then
-	sudo rm $videodev_dir/snd-soc-nau8822.ko
+## copy tegra-camera.ko file ##
+tegra_camera_dir=/lib/modules/$(uname -r)/updates/drivers/media/platform/tegra/camera
+if [ ! -f $tegra_camera_dir/tegra-camera.ko.orig ];then
+    echo "bakckup tegra-camera.ko"
+    sudo cp $tegra_camera_dir/tegra-camera.ko $tegra_camera_dir/tegra-camera.ko.orig
 fi
-sudo cp rootfs/$videodev_dir/snd-soc-nau8822.ko $videodev_dir
+sudo cp rootfs/$tegra_camera_dir/tegra-camera.ko $tegra_camera_dir
 
 # Video ko
-## copy videodev.ko file ##
+## copy videodev.ko file enable metadata ##
 videodev_dir=/lib/modules/$(uname -r)/kernel/drivers/media/v4l2-core
 if [ ! -f $videodev_dir/videodev.ko.orig ];then
 	echo "bakckup videodev.ko"
@@ -191,7 +233,23 @@ if [ ! -f $videodev_dir/videodev.ko.orig ];then
 fi
 sudo cp rootfs/$videodev_dir/videodev.ko $videodev_dir
 
-## copy fzcam.ko file ##
+## copy capture-ivc.ko file ##
+capture_ivc_dir=/lib/modules/$(uname -r)/updates/drivers/platform/tegra/rtcpu
+if [ ! -f $capture_ivc_dir/capture-ivc.ko.orig ];then
+    echo "bakckup capture-ivc.ko"
+    sudo cp $capture_ivc_dir/capture-ivc.ko $capture_ivc_dir/capture-ivc.ko.orig
+fi
+sudo cp rootfs/$capture_ivc_dir/capture-ivc.ko $capture_ivc_dir
+
+## copy nvhost-nvcsi-t194.ko file ##
+nvhost_nvcsi_t194_dir=/lib/modules/$(uname -r)/updates/drivers/video/tegra/host/nvcsi/
+if [ ! -f $nvhost_nvcsi_t194_dir/nvhost-nvcsi-t194.ko.orig ];then
+    echo "bakckup nvhost-nvcsi-t194.ko"
+    sudo cp $nvhost_nvcsi_t194_dir/nvhost-nvcsi-t194.ko $nvhost_nvcsi_t194_dir/nvhost-nvcsi-t194.ko.orig
+fi
+sudo cp rootfs/$nvhost_nvcsi_t194_dir/nvhost-nvcsi-t194.ko $nvhost_nvcsi_t194_dir
+
+#Video 335Lg+FZCAM/fzcam.ko
 videodev_dir=/lib/modules/$(uname -r)/updates/drivers/media/i2c
 if [ -e /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcama.ko ];then
 	sudo rm /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcama.ko
@@ -199,11 +257,34 @@ fi
 if [ -e /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcamb.ko ];then
 	sudo rm /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcamb.ko
 fi
-sudo cp rootfs/$videodev_dir/fzcama.ko $videodev_dir
-sudo cp rootfs/$videodev_dir/fzcamb.ko $videodev_dir
 
-# Add softdep to ensure fzcama loads before fzcamb
-echo "softdep fzcamb pre: fzcama" | sudo tee /etc/modprobe.d/fzcam.conf
+###################################################################
+if [ -e /lib/modules/$(uname -r)/updates/drivers/media/i2c/d4xx.ko ];then
+    sudo rm /lib/modules/$(uname -r)/updates/drivers/media/i2c/d4xx.ko
+fi
+if [ -e /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcam.ko ];then
+    sudo rm /lib/modules/$(uname -r)/updates/drivers/media/i2c/fzcam.ko
+fi
+
+## copy max9296.ko file ##
+## copy max9295.ko file ##
+sudo cp rootfs/$videodev_dir/max9295.ko $videodev_dir
+sudo cp rootfs/$videodev_dir/max9296.ko $videodev_dir
+sudo cp rootfs/$videodev_dir/max96712.ko $videodev_dir
+sudo cp rootfs/$videodev_dir/max96717.ko $videodev_dir
+sudo cp rootfs/$videodev_dir/d4xx.ko 	$videodev_dir
+sudo cp rootfs/$videodev_dir/fzcam.ko 	$videodev_dir
+#sudo cp serdes.ko 	$videodev_dir
+
+# Add softdep to ensure fzcam loads before g300
+echo "softdep fzcam pre: d4xx" | sudo tee /etc/modprobe.d/d4xx.conf
+
+# Sound
+videodev_dir=/lib/modules/$(uname -r)/kernel/sound/soc/codecs
+if [ -e $videodev_dir/snd-soc-nau8822.ko ];then
+	sudo rm $videodev_dir/snd-soc-nau8822.ko
+fi
+sudo cp rootfs/$videodev_dir/snd-soc-nau8822.ko $videodev_dir
 
 # RTL Ethernet
 ## copy r8168.ko file ##
@@ -221,13 +302,14 @@ if [ ! -f $spidev_dir/spidev.ko.orig ];then
 	echo "bakckup spidev.ko"
 	sudo cp $spidev_dir/spidev.ko $spidev_dir/spidev.ko.orig
 fi
-sudo cp rootfs/lib/modules/$(uname -r)/kernel/drivers/spi/spidev.ko  $spidev_dir
+sudo cp rootfs/$spidev_dir/spidev.ko $spidev_dir
+
 spidev_dir=/lib/modules/$(uname -r)/kernel/drivers/spi/
 if [ ! -f $spidev_dir/spi-tegra114.ko.orig ];then
 	echo "bakckup spi-tegra114.ko"
 	sudo cp $spidev_dir/spi-tegra114.ko $spidev_dir/spi-tegra114.ko.orig
 fi
-sudo cp rootfs/lib/modules/$(uname -r)/kernel/drivers/spi/spi-tegra114.ko $spidev_dir
+sudo cp rootfs/$spidev_dir/spi-tegra114.ko $spidev_dir
 
 spican_dir=/lib/modules/$(uname -r)/updates/drivers/net/can/spi/
 if [ ! -f $spican_dir ];then
@@ -314,7 +396,7 @@ sudo systemctl enable  /etc/systemd/system/acc_monitor.service
 sudo systemctl daemon-reload
 
 ##############################################################################################
-green_print 'Upgrade F30x firmware success, Press Enter to reboot Jetson'
+green_print 'Upgrade success, Press Enter to reboot Jetson or Ctrl+C cancel and reboot later'
 read key
 
 sudo reboot
