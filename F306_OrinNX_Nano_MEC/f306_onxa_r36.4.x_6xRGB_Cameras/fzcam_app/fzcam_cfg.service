@@ -27,12 +27,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 [Unit]
-Description=GMSL Camera Configuration Service
+Description=GMSL Camera Configuration (Y309 8ch)
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=multi-user.target graphical.target
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/local/bin/fzcam_cfg
-Restart=on-failure
+TimeoutStartSec=120
 
 [Install]
 WantedBy=multi-user.target
