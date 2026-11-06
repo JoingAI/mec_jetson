@@ -8,7 +8,7 @@
 
 ## 1. Profiles
 
-| profile | MAX9296 (LinkA) | MAX96724 (LinkA) | video nodes |
+| profile | MAX9296 (LinkA/CAM4) | MAX96724 (LinkA/CAM1) | video nodes |
 |---|---|---|---|
 | **a** | 2× RGB/YUV (ISX031F, fzcam) | 1× Gemini 335Lg (4 streams) | 6 |
 | **b** | 1× Gemini 335Lg (4 streams) | 4× RGB/YUV (ISX031F, fzcam) | 8 |
@@ -84,9 +84,9 @@ What the installer does:
    Jetson IO  ──┬── MAX9296  MFP0 ── coax ── ISX031 (RGB)
                └── MAX96724 MFP0 ── coax ── MAX9295D MFP6 ── Gemini 335Lg
                │
-      GTE hardware-timestamps every rising edge (TSC domain, 32 ns) ──► /dev/y306_fsync
+      Jetson captures hardware timestamps (32ns) ──► /dev/y306_fsync
                │
-      V4L2 frame timestamps (also TSC domain) ──► pair with nearest preceding edge
+      V4L2 frame timestamps ──► pair with nearest preceding edge
                ▼
       per frame: seq / frame TSC / trigger TSC / latency / UTC
 ```

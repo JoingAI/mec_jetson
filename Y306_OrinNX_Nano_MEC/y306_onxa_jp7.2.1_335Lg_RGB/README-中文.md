@@ -7,7 +7,7 @@
 
 ## 1. 三种配置
 
-| profile | MAX9296（LinkA） | MAX96724（LinkA） | video 节点 |
+| profile | MAX9296 (LinkA/CAM4) | MAX96724 (LinkA/CAM1) | video nodes |
 |---|---|---|---|
 | **a** | 2× RGB/YUV（ISX031F，fzcam） | 1× Gemini 335Lg（4 流） | 6 |
 | **b** | 1× Gemini 335Lg（4 流） | 4× RGB/YUV（ISX031F，fzcam） | 8 |
@@ -79,9 +79,9 @@ sudo bash verify.sh                       # 期望全 PASS
   Jetson IO  ──┬── MAX9296  MFP0 ── 同轴 ── ISX031 (RGB)
                └── MAX96724 MFP0 ── 同轴 ── MAX9295D MFP6 ── Gemini 335Lg
                │
-      GTE 给每个上升沿打硬件戳（TSC 域，32 ns）──► /dev/y306_fsync
+      Jetson捕获硬件时间戳（32ns）──► /dev/y306_fsync
                │
-      V4L2 帧时间戳（同为 TSC 域）──► 取"帧前最近边沿"配对
+      V4L2 帧时间戳──► 取"帧前最近边沿"配对
                ▼
       每帧：seq / 帧 TSC / 触发 TSC / 延迟 / UTC
 ```
