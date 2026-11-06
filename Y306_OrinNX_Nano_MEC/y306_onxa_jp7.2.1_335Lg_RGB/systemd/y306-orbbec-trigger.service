@@ -1,0 +1,13 @@
+[Unit]
+Description=Y306 sync init (MCU trigger rate + Orbbec 335Lg hardware triggering)
+After=y306-obc-camera.service
+Before=fzcam_cfg.service
+Wants=y306-obc-camera.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/y306_sync_setup.sh
+
+[Install]
+WantedBy=multi-user.target

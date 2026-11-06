@@ -1,0 +1,12 @@
+[Unit]
+Description=Y306 Orbbec GMSL camera driver loader (335Lg)
+After=systemd-modules-load.service
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/y306-obc-load.sh
+
+[Install]
+WantedBy=multi-user.target

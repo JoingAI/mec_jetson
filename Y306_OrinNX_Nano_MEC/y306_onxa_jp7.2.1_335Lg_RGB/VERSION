@@ -1,0 +1,6 @@
+package: y306-sync-cam
+version: v3.0
+date: 2026-11-05
+target: Y306 / Orin NX 16GB, L4T R39.2.1 (6.8.12-1021-tegra)
+base: gitlab y306_orbbec @ bc8696a39
+contents: profiles a/b/c, hardware trigger (MCU + Orbbec SDK), GTE timestamps

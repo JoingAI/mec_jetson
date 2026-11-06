@@ -1,0 +1,10 @@
+03b5565ea8bc1e8cebd13caf260fa786  artifacts/modules/fzcam.ko
+375be3f93ce583150fdc7fc97d9a9082  artifacts/modules/g300.ko
+6cd12b19119a2ab4d71dc46dc36e20b5  artifacts/modules/obc_max9296.ko
+98314d5d03748a8f7e8ee49b9c98f865  artifacts/modules/obc_max96712.ko
+34ad431332e266292f8d3d834d855eca  artifacts/modules/obcam.ko
+60d4d41d7a7da6278ffb615751a10c44  artifacts/modules/tegra-camera.ko
+5f658c9f507862e57bd1d32ffaa6e26d  artifacts/modules/y306_fsync_cap.ko
+47f169a7e2fe7956bbdf030ad821bb85  artifacts/dtbo/tegra234-p3767-camera-p3768-y306-mixed-a.dtbo
+252b36e553e106389ba8fb98c3456b64  artifacts/dtbo/tegra234-p3767-camera-p3768-y306-mixed-b.dtbo
+f0eff996cc2803cc54bb37af7c2beb19  artifacts/dtbo/tegra234-p3767-camera-p3768-y306-mixed-c.dtbo
