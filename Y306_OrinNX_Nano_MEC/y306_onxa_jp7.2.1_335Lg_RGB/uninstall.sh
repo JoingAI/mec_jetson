@@ -20,6 +20,7 @@ rm -f /etc/systemd/system/y306-orbbec-trigger.service \
       /usr/local/bin/y306_frame_ts.py \
       /usr/local/bin/y306_fsync_read.py \
       /usr/local/bin/y306_mcu_freq.py \
+      /usr/local/bin/y306_mcu_ver.py \
       /etc/y306-sync.conf /etc/y306-sync-profile \
       /etc/ld.so.conf.d/orbbec-sdk.conf
 rmdir /etc/systemd/system/fzcam_cfg.service.d 2>/dev/null || true
@@ -28,7 +29,7 @@ ldconfig 2>/dev/null || true
 
 rm -rf "$MODDIR" "$FSYNCDIR"
 rm -f /etc/modprobe.d/y306-obc-manual.conf
-rm -rf /opt/orbbec-sdk
+rm -rf /opt/orbbec-sdk /opt/y306-sync
 
 if [ -f "$CAMDIR/tegra-camera.ko.orig" ]; then
     cp -f "$CAMDIR/tegra-camera.ko.orig" "$CAMDIR/tegra-camera.ko"

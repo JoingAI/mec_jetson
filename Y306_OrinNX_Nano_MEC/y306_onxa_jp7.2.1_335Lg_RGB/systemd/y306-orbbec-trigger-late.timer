@@ -1,0 +1,10 @@
+[Unit]
+Description=Re-apply 335Lg hardware triggering 40s after boot (camera boot finishes later)
+
+[Timer]
+OnBootSec=40s
+AccuracySec=1s
+Unit=y306-orbbec-trigger-late.service
+
+[Install]
+WantedBy=timers.target

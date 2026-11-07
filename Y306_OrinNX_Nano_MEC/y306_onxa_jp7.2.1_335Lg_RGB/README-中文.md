@@ -7,7 +7,7 @@
 
 ## 1. 三种配置
 
-| profile | MAX9296 (LinkA/CAM4) | MAX96724 (LinkA/CAM1) | video nodes |
+| profile | MAX9296（LinkA） | MAX96724（LinkA） | video 节点 |
 |---|---|---|---|
 | **a** | 2× RGB/YUV（ISX031F，fzcam） | 1× Gemini 335Lg（4 流） | 6 |
 | **b** | 1× Gemini 335Lg（4 流） | 4× RGB/YUV（ISX031F，fzcam） | 8 |
@@ -33,17 +33,6 @@ y306-sync-cam/
 
 ## 3. 安装
 
-### 3.1 预安装
-
-从Github 下载固件包: y306_onxa_jp7.2.1_6xYUV
-```
-cd y306_onxa_jp7.2.1_6xYUV
-sudo bash y306.upgrade.jp7.2.1_r39.2.1.sh
-
-#升级完成后不需要重启 Jetson，直接安装相机套件
-```
-
-### 3.2 安装相机套件
 ```bash
 tar xzf y306-sync-cam-v3.0.tar.gz
 cd y306-sync-cam
@@ -73,15 +62,15 @@ sudo bash verify.sh                       # 期望全 PASS
 ## 4. 同步与时间戳是怎么实现的
 
 ```
-     MCU  (0xAA 指令设频，默认 10 Hz)
+MCU STM32F103 (0xAA 指令设频，默认 10 Hz)
       │ FSYNC (Pin18)
       ▼
-  Jetson IO  ──┬── MAX9296  MFP0 ── 同轴 ── ISX031 (RGB)
+  AON PCC.00 ──┬── MAX9296  MFP0 ── 同轴 ── ISX031F (RGB)
                └── MAX96724 MFP0 ── 同轴 ── MAX9295D MFP6 ── Gemini 335Lg
                │
-      Jetson捕获硬件时间戳（32ns）──► /dev/y306_fsync
+      GTE 给每个上升沿打硬件戳（TSC 域，32 ns）──► /dev/y306_fsync
                │
-      V4L2 帧时间戳──► 取"帧前最近边沿"配对
+      V4L2 帧时间戳（同为 TSC 域）──► 取"帧前最近边沿"配对
                ▼
       每帧：seq / 帧 TSC / 触发 TSC / 延迟 / UTC
 ```
@@ -95,6 +84,102 @@ sudo bash verify.sh                       # 期望全 PASS
 |---|---|---|---|
 | RGB `/dev/video0` | 9.999 fps | 18.81 ms | 0.035 ms |
 | 335Lg `/dev/video5` | 9.999 fps | 35.67 ms | 0.003 ms |
+
+## 4.0 触发源：MCU（默认）
+
+Y306 标配由载板 MCU 产生 FSYNC，`/etc/y306-sync.conf` 默认 `TRIGGER_SOURCE=mcu`：
+开机用 `0xAA 01 <freq×100> <duty> <cs> 0x55` 下发 10 Hz / 10%，MCU 回 `AA 02 00 0A 0A C0 55`。
+
+> **两条必须知道的坑**
+> 1. **MCU 固件必须 ≥ V1.2_10**。旧版（V1.0）不响应 `0xAA` 频率指令、也不产生触发，
+>    表现为"相机进了触发模式但一帧不出、`/dev/y306_fsync` 边沿为 0"。
+>    升级方法见 `../../cases/CASE-20261107-y306-mcu-firmware-upgrade.md`。
+> 2. **打开串口会 DTR 复位 MCU**，必须等 ~1.6 s 再发帧，否则"发得出去、没有应答"。
+>    `y306_mcu_freq.py` 已内置该延时与 3 次重试。
+
+### 4.0.1 没有 MCU 的调试样机（`soc`）
+
+系统按 `/etc/y306-sync.conf` 的 `TRIGGER_SOURCE` 自动选触发源：
+
+| 值 | 行为 |
+|---|---|
+| `mcu`（**默认**，Y306 产品配置） | 由载板 MCU 产生触发；开机下发 10 Hz 指令 |
+| `soc` | 由 SoC 产生触发（仅调试样机、没有 MCU 时使用） |
+| `auto` | 开机探测：有 MCU 用 MCU，没有则退回 SoC |
+
+SoC 产生触发的原理：`y306_fsync_cap` 模块以 `gen_hz=10` 加载，用 hrtimer 驱动
+AON PCC.00（与 MCU 同一根 FSYNC 网络），HTE 仍然对这根线上的每个上升沿打 TSC 戳，
+所以**时间戳链路完全不变**。
+
+实测（无 MCU 的整机，10 Hz）：
+
+```
+video0 10.0000 fps   video4 10.0014 fps
+延迟 35.741 ms  spread 0.001 ms  （与有 MCU 时同量级）
+```
+
+> 注意：相机上电初始化比 systemd 服务晚，单次设置可能不生效，
+> 所以包里另有一个 `y306-orbbec-trigger-late.timer`（开机 40 s 后再设一次）。
+
+## 4.1 接 1 / 2 / 3 路相机时（重要）
+
+`fzcam_cfg.ini` 的 `position=Video_ABCD` 是**端口掩码**（A/B/C/D 四口），
+不是"接几路就填几个 1"。**建议始终写 `Video_1111`**，工具会自动识别实际锁定的链路，
+只配置有相机的那些口。
+
+**本包内的 dtsi 已按正确顺序排列**（同型号节点降序书写），因此 `video0` 对应 Link A：
+
+| 物理端口 | i2c 地址 | video 节点 |
+|---|---|---|
+| Link A | 0x3a | `/dev/video3` |
+| Link B | 0x3b | `/dev/video2` |
+| Link C | 0x3c | `/dev/video1` |
+| Link D | 0x3d | `/dev/video0` |
+
+（若用自行修改的 dtsi，务必保持这个书写顺序——节点顺序反过来会导致 video0 变成 Link D。）
+
+所以：
+
+| 接了 | 有画面的节点 | 没画面的节点 |
+|---|---|---|
+| 1 路（A） | video3 | video0-2 |
+| 2 路（A,B） | video2, video3 | video0, video1 |
+| 3 路（A,B,C） | video1, video2, video3 | video0 |
+| 4 路 | video0-3 | — |
+
+**上层程序不要假设 `video0..N-1` 就是前 N 路**，否则 1/2/3 路时全部打不开。
+正确做法是用枚举工具按"相机地址/端口"选节点：
+
+```bash
+sudo /usr/local/bin/y306_list_cams.py --probe
+# node    type   addr   port     status
+# video0  RGB    0x3d   Link D   no signal
+# video1  RGB    0x3c   Link C   10.00 fps
+# video2  RGB    0x3b   Link B   10.00 fps
+# video3  RGB    0x3a   Link A   10.00 fps
+# video4  335Lg  0x66   stream=depth 10.00 fps
+# ...
+```
+
+节点名里也直接带地址，可以按名字映射，不必依赖序号：
+
+```bash
+cat /sys/class/video4linux/video1/name     # vi-output, fzcam 2-003c  → Link C
+```
+
+> 若运行着 OrbbecViewer，它会独占 335Lg 的节点，枚举出的 fps 会失真甚至 no signal。
+
+## 4.2 MCU 固件（触发源）
+
+相机同步触发由载板 STM32F103 产生，**固件必须 ≥ V1.2_10**（旧版不响应频率指令、不产生触发）。
+
+```bash
+sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc --check   # 查版本
+sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc           # 升级（两趟 + 两次断电）
+sudo python3 /opt/y306-sync/mcu/tools/mcu_freq.py 10 10           # 设 10 Hz / 10%
+```
+
+完整说明（变体选择、A/B 双槽、协议表、故障处理）见 **`mcu/README-中文.md`**。
 
 ## 5. 取每帧时间戳
 

@@ -8,7 +8,7 @@
 
 ## 1. Profiles
 
-| profile | MAX9296 (LinkA/CAM4) | MAX96724 (LinkA/CAM1) | video nodes |
+| profile | MAX9296 (LinkA) | MAX96724 (LinkA) | video nodes |
 |---|---|---|---|
 | **a** | 2× RGB/YUV (ISX031F, fzcam) | 1× Gemini 335Lg (4 streams) | 6 |
 | **b** | 1× Gemini 335Lg (4 streams) | 4× RGB/YUV (ISX031F, fzcam) | 8 |
@@ -35,17 +35,6 @@ y306-sync-cam/
 
 ## 3. Install
 
-### 3.1 Pre-Install
-
-Download the package: y306_onxa_jp7.2.1_6xYUV from github
-```
-cd y306_onxa_jp7.2.1_6xYUV
-sudo bash y306.upgrade.jp7.2.1_r39.2.1.sh
-
-#Do not need to reboot after upgrade
-```
-
-### 3.2 Install
 ```bash
 tar xzf y306-sync-cam-v3.0.tar.gz
 cd y306-sync-cam
@@ -78,15 +67,15 @@ What the installer does:
 ## 4. How sync and timestamps work
 
 ```
-     MCU (0xAA frame sets the rate, default 10 Hz)
+MCU STM32F103 (0xAA frame sets the rate, default 10 Hz)
       │ FSYNC (pin18)
       ▼
-   Jetson IO  ──┬── MAX9296  MFP0 ── coax ── ISX031 (RGB)
+  AON PCC.00 ──┬── MAX9296  MFP0 ── coax ── ISX031F (RGB)
                └── MAX96724 MFP0 ── coax ── MAX9295D MFP6 ── Gemini 335Lg
                │
-      Jetson captures hardware timestamps (32ns) ──► /dev/y306_fsync
+      GTE hardware-timestamps every rising edge (TSC domain, 32 ns) ──► /dev/y306_fsync
                │
-      V4L2 frame timestamps ──► pair with nearest preceding edge
+      V4L2 frame timestamps (also TSC domain) ──► pair with nearest preceding edge
                ▼
       per frame: seq / frame TSC / trigger TSC / latency / UTC
 ```
@@ -100,6 +89,105 @@ Measured at 10 Hz, after a plain reboot with no manual step:
 |---|---|---|---|
 | RGB `/dev/video0` | 9.999 | 18.81 ms | 0.035 ms |
 | 335Lg `/dev/video5` | 9.999 | 35.67 ms | 0.003 ms |
+
+## 4.0 Trigger source: MCU (default)
+
+Y306 normally takes FSYNC from the carrier MCU; `/etc/y306-sync.conf` defaults to
+`TRIGGER_SOURCE=mcu`. At boot the service sends
+`0xAA 01 <freq*100> <duty> <cs> 0x55` for 10 Hz / 10 % and expects
+`AA 02 00 0A 0A C0 55` back.
+
+> **Two gotchas**
+> 1. **MCU firmware must be >= V1.2_10.** V1.0 ignores the `0xAA` rate command and
+>    never generates the trigger: the camera sits in triggering mode with zero
+>    frames and `/dev/y306_fsync` shows no edges. Upgrade procedure:
+>    `../../cases/CASE-20261107-y306-mcu-firmware-upgrade.md`.
+> 2. **Opening the serial port resets the MCU via DTR.** Wait ~1.6 s before sending
+>    or the frame is silently dropped (`y306_mcu_freq.py` already does this, with retries).
+
+### 4.0.1 Debug units without an MCU (`soc`)
+
+`/etc/y306-sync.conf: TRIGGER_SOURCE` selects the source:
+
+| value | behaviour |
+|---|---|
+| `mcu` (**default**, Y306 product config) | MCU on the carrier generates the trigger; the boot service sends the 10 Hz command |
+| `soc` | SoC generates the trigger (debug units without an MCU only) |
+| `auto` | probe at boot: MCU if present, otherwise fall back to the SoC |
+
+In SoC mode `y306_fsync_cap` is loaded with `gen_hz=10`: an hrtimer toggles
+AON PCC.00, which is the same FSYNC net the MCU drives. HTE still timestamps
+every rising edge, so **the timestamp path is unchanged**.
+
+Measured on a machine without an MCU at 10 Hz:
+
+```
+video0 10.0000 fps   video4 10.0014 fps
+latency 35.741 ms  spread 0.001 ms
+```
+
+> The camera finishes its own boot later than the systemd unit, so a single set
+> may not stick; the package ships `y306-orbbec-trigger-late.timer`, which
+> re-applies the setting 40 s after boot.
+
+## 4.1 Using 1 / 2 / 3 cameras (important)
+
+`position=Video_ABCD` in `fzcam_cfg.ini` is a **port mask** (ports A/B/C/D), not a
+camera count. **Always use `Video_1111`** — the tool detects which links are
+actually locked and configures only those.
+
+The dtsi shipped in this package lists the same-model sensor nodes in descending
+address order, so `video0` maps to Link A:
+
+| port | i2c | video node |
+|---|---|---|
+| Link A | 0x3a | `/dev/video3` |
+| Link B | 0x3b | `/dev/video2` |
+| Link C | 0x3c | `/dev/video1` |
+| Link D | 0x3d | `/dev/video0` |
+
+(If you modify the dtsi yourself, keep that node ordering — reversing it makes
+`video0` point at Link D.)
+
+| cameras connected | nodes with video | nodes without |
+|---|---|---|
+| 1 (A) | video3 | video0-2 |
+| 2 (A,B) | video2, video3 | video0, video1 |
+| 3 (A,B,C) | video1, video2, video3 | video0 |
+| 4 | video0-3 | — |
+
+**Never assume `video0..N-1` are the first N cameras** — with 1/2/3 cameras most
+of those nodes carry no data. Select nodes by camera address instead:
+
+```bash
+sudo /usr/local/bin/y306_list_cams.py --probe
+# video1  RGB    0x3c   Link C   10.00 fps
+# video2  RGB    0x3b   Link B   10.00 fps
+# video3  RGB    0x3a   Link A   10.00 fps
+```
+
+The node name also carries the address, so mapping by name is trivial:
+
+```bash
+cat /sys/class/video4linux/video1/name     # vi-output, fzcam 2-003c -> Link C
+```
+
+> If OrbbecViewer is running it owns the 335Lg nodes, so the reported fps may be
+> distorted or show "no signal".
+
+## 4.2 MCU firmware (trigger source)
+
+The sync trigger comes from the carrier's STM32F103; the **firmware must be >= V1.2_10**
+(older versions ignore the rate command and generate no trigger).
+
+```bash
+sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc --check   # version
+sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc           # upgrade (2 passes + 2 power cycles)
+sudo python3 /opt/y306-sync/mcu/tools/mcu_freq.py 10 10           # set 10 Hz / 10 %
+```
+
+Full details (variant choice, A/B slots, protocol table, troubleshooting):
+**`mcu/README-EN.md`**.
 
 ## 5. Reading timestamps
 

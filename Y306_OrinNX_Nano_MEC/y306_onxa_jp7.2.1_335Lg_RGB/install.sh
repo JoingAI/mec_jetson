@@ -90,6 +90,13 @@ say "4/9 安装同步工具"
 install -m 755 "$HERE/tools/y306_frame_ts.py" /usr/local/bin/y306_frame_ts.py
 install -m 755 "$HERE/tools/fsync_read.py"   /usr/local/bin/y306_fsync_read.py
 install -m 755 "$HERE/tools/mcu_freq.py"     /usr/local/bin/y306_mcu_freq.py
+install -m 755 "$HERE/tools/y306_list_cams.py" /usr/local/bin/y306_list_cams.py
+# MCU 固件与 OTA 工具（常驻 /opt/y306-sync/mcu，便于现场二次升级）
+install -d /opt/y306-sync
+rm -rf /opt/y306-sync/mcu
+cp -r "$HERE/mcu" /opt/y306-sync/mcu
+chmod +x /opt/y306-sync/mcu/upgrade.sh /opt/y306-sync/mcu/tools/*.py
+install -m 755 "$HERE/mcu/tools/mcu_ver.py" /usr/local/bin/y306_mcu_ver.py
 install -m 755 "$HERE/systemd/y306_sync_setup.sh" /usr/local/bin/y306_sync_setup.sh
 
 say "5/9 配置 fzcam（RGB 侧）"
@@ -103,6 +110,8 @@ EOF
 install -m 755 "$HERE/systemd/y306-obc-load.sh" /usr/local/sbin/y306-obc-load.sh
 install -m 644 "$HERE/systemd/y306-obc-camera.service" /etc/systemd/system/
 install -m 644 "$HERE/systemd/y306-orbbec-trigger.service" /etc/systemd/system/
+install -m 644 "$HERE/systemd/y306-orbbec-trigger-late.service" /etc/systemd/system/
+install -m 644 "$HERE/systemd/y306-orbbec-trigger-late.timer" /etc/systemd/system/
 mkdir -p /etc/systemd/system/fzcam_cfg.service.d
 install -m 644 "$HERE/systemd/fzcam-order.conf" /etc/systemd/system/fzcam_cfg.service.d/10-y306-obc.conf
 cat > /etc/modprobe.d/y306-obc-manual.conf <<EOF
@@ -112,7 +121,7 @@ install g300 /bin/false
 install obcam /bin/false
 EOF
 systemctl daemon-reload
-systemctl enable y306-obc-camera.service y306-orbbec-trigger.service >/dev/null 2>&1
+systemctl enable y306-obc-camera.service y306-orbbec-trigger.service y306-orbbec-trigger-late.timer >/dev/null 2>&1
 
 say "7/9 设置启动项"
 python3 "$HERE/extlinux-add.py" "$PROFILE" || die "启动项设置失败"
@@ -132,5 +141,7 @@ if [ "$REBOOT" = "1" ]; then
 else
     echo "  已跳过重启（DT 需重启生效）"
 fi
+echo "  MCU 版本：sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc --check"
+echo "  MCU 升级：sudo bash /opt/y306-sync/mcu/upgrade.sh --variant noacc"
 echo "  验证：sudo bash $HERE/verify.sh"
 echo "  回滚：sudo bash $HERE/uninstall.sh"

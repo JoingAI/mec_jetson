@@ -1,0 +1,7 @@
+[Unit]
+Description=Y306 re-apply Orbbec 335Lg hardware triggering after camera boot
+After=y306-orbbec-trigger.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/y306_orb_trigger --frames-per-trigger 1
