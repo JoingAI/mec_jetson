@@ -144,6 +144,15 @@ green_print 'extlinux.conf 已配置 (LABEL JetsonIO + FDT + OVERLAYS)'
 sudo depmod -a
 green_print 'depmod 完成'
 
+# ---- FSYNC/HTE 模块开机自加载 ----
+if [ -f "$MOD_DIR/updates/y309_fsync_cap.ko" ] ; then
+    echo y309_fsync_cap | sudo tee /etc/modules-load.d/y309_fsync.conf > /dev/null
+    sudo modprobe y309_fsync_cap 2>/dev/null && green_print 'y309_fsync_cap 加载成功' || red_print 'y309_fsync_cap 加载失败'
+    green_print '已配置 /etc/modules-load.d/y309_fsync.conf'
+else
+    red_print '缺 updates/y309_fsync_cap.ko，跳过 FSYNC 模块'
+fi
+
 # ---- 验证 fzcam ko ----
 if [ -f "$MOD_DIR/updates/drivers/media/i2c/fzcam.ko" ] ; then
     green_print 'fzcam ko 已部署 (fzcam.ko)'
