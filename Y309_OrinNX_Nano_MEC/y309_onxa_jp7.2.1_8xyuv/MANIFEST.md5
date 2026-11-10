@@ -1,0 +1,15 @@
+bdb5eedba7cd5953ce32310b918a9a61  boot/Image
+3848d0720b1b6dffd3f23e485994a17d  boot/dtb/tegra234-p3768-0000+p3767-0000-nv.dtb
+d0dfe6b6c5d2f7a36688aca9b4143b0a  boot/dtb/tegra234-p3768-0000+p3767-0000-nv-super.dtb
+a7ee0734c154d1728dcb62f45005d84f  boot/dtb/tegra234-p3768-0000+p3767-0001-nv.dtb
+4efb269df04a77aab7f796a79a0e48c2  boot/dtb/tegra234-p3768-0000+p3767-0001-nv-super.dtb
+7c9e6f8699c1fc6c1af8ff32ee295686  boot/dtb/tegra234-p3768-0000+p3767-0003-nv.dtb
+e0a8e79a8ba0c27ff149187e9d61358a  boot/dtb/tegra234-p3768-0000+p3767-0003-nv-super.dtb
+e9ea46bba55323aa6c005040910c3e58  boot/dtb/tegra234-p3768-0000+p3767-0004-nv.dtb
+5d42abb172c71caafe82a67a9f403cfe  boot/dtb/tegra234-p3768-0000+p3767-0004-nv-super.dtb
+f692261610367734fa71c30a4b224dfd  boot/tegra234-p3767-0000-y309-board.dtbo
+eabfd41b0c00061cc33fefcf48f57d17  boot/tegra234-p3767-camera-p3768-y309-8xRGB.dtbo
+8f2e7c3d18a59cc6db4f6df87ac1999a  updates/y309_fsync_cap.ko
+78196f7003b989337804249ab68a7004  updates/drivers/media/i2c/fzcam.ko
+03977b8efa4fc41b7e9b0931917556ae  updates/drivers/net/ethernet/realtek/r8168/r8168.ko
+30976ed809859ad7d7cc3e4eb94565c7  kernel/drivers/media/v4l2-core/videodev.ko

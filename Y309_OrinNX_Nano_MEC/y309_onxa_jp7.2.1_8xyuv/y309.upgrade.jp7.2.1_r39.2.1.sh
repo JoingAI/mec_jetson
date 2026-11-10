@@ -53,6 +53,18 @@ fi
 sudo cp "$FW/boot/Image" /boot/
 green_print 'Image 已更新'
 
+# ---- Image 基线校验（防止把未验证的内核刷进量产机）----
+if [ -f "$FW/MANIFEST.md5" ]; then
+    want=$(awk '$2=="boot/Image"{print $1}' "$FW/MANIFEST.md5")
+    got=$(md5sum /boot/Image | awk '{print $1}')
+    if [ -n "$want" ] && [ "$want" != "$got" ]; then
+        red_print "!! Image 校验失败：期望 $want 实际 $got"
+        red_print "!! 本包 Image 与基线不一致，已中止（/boot/Image.orig 为原镜像）"
+        exit 1
+    fi
+    green_print "Image 基线校验通过 ($got)"
+fi
+
 # ---- 拷贝 DTB (kernel_ 前缀) ----
 if [ ! -d /boot/dtb ]; then
     sudo mkdir -p /boot/dtb
