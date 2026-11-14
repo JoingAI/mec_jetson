@@ -1,0 +1,14 @@
+[Unit]
+Description=Y309 Orbbec G300 GMSL camera modules
+ConditionPathExists=/proc/device-tree/bus@0/i2c@3160000/max96724@27
+After=systemd-udev-trigger.service
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/modprobe obc_max96712
+ExecStart=-/sbin/modprobe obc_cam_sync
+ExecStart=-/sbin/modprobe g300
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

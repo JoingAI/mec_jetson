@@ -101,7 +101,16 @@ python3 y309ctl.py ver
 
 ---
 
-## 本次新增：RS485 共存保护
+## Y309内置MCU给触发信号，配置说明
+```bash
+python3 /home/nvidia/y309_sync/scripts/y309ctl.py ver
+python3 /home/nvidia/y309_sync/scripts/y309ctl.py status        # ST pwr=3 pps=1 per=994 f=10 d=10 en=1
+python3 /home/nvidia/y309_sync/scripts/y309ctl.py set 10 10     # 频率 10Hz / 占空比 10%
+python3 /home/nvidia/y309_sync/scripts/y309ctl.py hb 1          # 心跳（HB 行，含 lper/bad/to/cap）
+```
+---
+
+## RS485 共存保护
 
 | 项 | 说明 |
 |---|---|

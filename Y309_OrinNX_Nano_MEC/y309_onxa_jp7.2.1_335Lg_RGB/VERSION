@@ -1,0 +1,8 @@
+y309-mixed 2.0.0
+board: Y309 (Orin NX 16GB)
+bsp: JetPack 7.2.1 / L4T R39.2.1 (kernel 6.8.12-1021-tegra)
+camera: 1x Gemini 335Lg (U7/i2c@3180000, CSI C) + 4x JoingAI ISX031F (U6/i2c@3160000, CSI A)
+trigger: MCU 20Hz/10% (shared FSYNC) + I210 1PPS; 335Lg needs HW-trigger (syncMode=0x40)
+fzcam_cfg: fixed build (position=None -> skip PoC/MFP write), md5 2fe77abc
+acceptance: coldboot x3 pass; option1 30min corr=0; option2 30min corr=2 (335Lg 19.98-19.99fps x36000+, fzcam 20.01fps)
+tools: y309_orb_trigger (HW trigger), y309_335lg_cap (SDK 335Lg 4-stream capture)
